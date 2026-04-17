@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agency Op Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink-zone: #f9cfe0;
+    --pink-placed: #e0527f;
+    --pink-placed-dark: #b83f66;
+    --blue-zone: #bdd9f7;
+    --blue-placed: #3a8ee6;
+    --blue-placed-dark: #2266b8;
+    --bg: #0f0e13;
+    --surface: #1a1825;
+    --surface2: #231f31;
+    --border: rgba(255,255,255,0.07);
+    --text: #f0ecff;
+    --text2: #9990b8;
+    --accent: #c77dff;
+    --green: #6ee7b7;
+    --red: #f87171;
+    --cell: 34px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 800px; height: 400px;
+    background: radial-gradient(ellipse, rgba(199,125,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    width: 100%;
+    max-width: 860px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, #c77dff, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo span {
+    font-weight: 400;
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    -webkit-text-fill-color: var(--text2);
+    color: var(--text2);
+    background: none;
+    margin-left: 8px;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .stat {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text2);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .stat-val {
+    font-size: 20px;
+    font-weight: 600;
+    font-family: 'Syne', sans-serif;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-val.highlight { color: var(--accent); }
+
+  .main-layout {
+    width: 100%;
+    max-width: 860px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .board-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+
+  .zone-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  #board {
+    display: grid;
+    width: fit-content;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: crosshair;
+    position: relative;
+  }
+
+  .cell {
+    width: var(--cell);
+    height: var(--cell);
+    border: 0.5px solid rgba(0,0,0,0.12);
+    transition: filter 0.06s;
+    position: relative;
+  }
+
+  .cell.pink-zone  { background: var(--pink-zone); }
+  .cell.blue-zone  { background: var(--blue-zone); }
+  .cell.filled-pink { background: var(--pink-placed); }
+  .cell.filled-blue { background: var(--blue-placed); }
+
+  .cell.filled-gray { background: #5a5470; }
+
+  .cell.hl-ok  { outline: 2.5px solid var(--green); outline-offset: -2px; z-index: 3; }
+  .cell.hl-bad { outline: 2.5px solid var(--red); outline-offset: -2px; z-index: 3; }
+
+  .skip-cost {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--red);
+    text-align: center;
+    margin-top: 2px;
+    min-height: 14px;
+  }
+
+  .divider-line {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    margin: 2px 0;
+    pointer-events: none;
+  }
+
+  .bottom-panel {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .queue-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 10px;
+  }
+
+  #queue {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .qpiece {
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 6px;
+    opacity: 0.5;
+    transition: opacity 0.15s, border-color 0.15s;
+  }
+
+  .qpiece.active {
+    opacity: 1;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 4px 16px rgba(199,125,255,0.15);
+  }
+
+  .piece-grid { display: grid; gap: 2px; }
+
+  .pcell {
+    width: 22px; height: 22px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+
+  .qlabel {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    text-align: center;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  .controls-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 130px;
+  }
+
+  .btn {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.08s;
+    width: 100%;
+    letter-spacing: 0.02em;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: rgba(199,125,255,0.1);
+    border-color: rgba(199,125,255,0.3);
+  }
+
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+
+  .btn:disabled { opacity: 0.3; cursor: default; }
+
+  .btn.danger:hover:not(:disabled) {
+    background: rgba(248,113,113,0.1);
+    border-color: rgba(248,113,113,0.3);
+    color: var(--red);
+  }
+
+  .btn.primary {
+    background: linear-gradient(135deg, #c77dff22, #f472b622);
+    border-color: rgba(199,125,255,0.4);
+    color: var(--accent);
+  }
+
+  .skip-pips {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-top: 2px;
+  }
+
+  .pip {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    transition: background 0.2s, transform 0.2s;
+  }
+
+  .pip.used {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+
+  #msg {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    min-height: 16px;
+    margin-top: 2px;
+  }
+
+  .gameover-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,14,19,0.85);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+  }
+
+  .gameover-overlay.show { display: flex; }
+
+  .gameover-card {
+    background: var(--surface);
+    border: 1px solid rgba(199,125,255,0.3);
+    border-radius: 20px;
+    padding: 36px 44px;
+    text-align: center;
+    max-width: 340px;
+    width: 90%;
+    box-shadow: 0 0 60px rgba(199,125,255,0.12), 0 24px 64px rgba(0,0,0,0.5);
+    animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .go-title {
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(90deg, #c77dff, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .go-reason {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 24px;
+  }
+
+  .go-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .go-stat {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .go-stat-lbl {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .go-stat-val {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .coverage-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .coverage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #c77dff, #f472b6);
+    border-radius: 99px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .how-to {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .how-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  .how-icon {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">AGENCY OP MODEL<span>operating model puzzle</span></div>
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-val highlight" id="score">0</div>
+      <div>score</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="coverage">0%</div>
+      <div>coverage</div>
+    </div>
+  </div>
+</header>
+
+<div class="main-layout">
+
+  <div class="board-container">
+    <div class="zone-label" style="color:#e0527f">▲ Standard Work</div>
+    <div id="board"></div>
+    <div class="zone-label" style="color:#3a8ee6; margin-top:4px">▼ Specialized Work</div>
+    <div id="msg" style="margin-top:8px">Pink cells → Standard Work. Blue cells → Specialized Work. Space to rotate.</div>
+  </div>
+
+  <div class="bottom-panel">
+    <div class="queue-section">
+      <div class="section-label">Agency Partners</div>
+      <div id="queue"></div>
+    </div>
+
+    <div class="controls-section">
+      <div class="section-label" style="text-align:center">Controls</div>
+      <button class="btn primary" id="btn-rotate">↻ Rotate [space]</button>
+      <button class="btn" id="btn-skip">Skip [S]</button>
+      <div class="skip-cost" id="skip-cost"></div>
+      <div class="skip-pips" id="pips"></div>
+      <div style="flex:1"></div>
+      <button class="btn danger" id="btn-restart">New game</button>
+    </div>
+  </div>
+
+  <div class="how-to">
+    <div class="how-item"><div class="how-icon">🖱</div> click to place</div>
+    <div class="how-item"><div class="how-icon">⎵</div> space = rotate</div>
+    <div class="how-item"><div class="how-icon">S</div> skip partner</div>
+    <div class="how-item"><div class="how-icon">R</div> new game</div>
+    <div class="how-item"><div class="how-icon">📐</div> fill the model</div>
+  </div>
+</div>
+
+<div class="gameover-overlay" id="gameover">
+  <div class="gameover-card">
+    <div class="go-title">Game Over</div>
+    <div class="go-reason" id="go-reason">No legal placements remaining</div>
+    <div class="go-stats">
+      <div class="go-stat"><div class="go-stat-lbl">score</div><div class="go-stat-val" id="go-score">0</div></div>
+      <div class="go-stat"><div class="go-stat-lbl">coverage</div><div class="go-stat-val" id="go-coverage">0%</div></div>
+    </div>
+    <div class="coverage-bar"><div class="coverage-fill" id="go-bar" style="width:0%"></div></div>
+    <button class="btn primary" onclick="initGame()" style="font-size:15px; padding:12px;">Play Again</button>
+  </div>
+</div>
+
+<script>
+const COLS = 20, ROWS = 10, HALF = 5, MAX_SKIPS = 5, QUEUE_VISIBLE = 5;
+const SKIP_COSTS = [5, 10, 15, 20, 30];
+
+let grid, score, skips, pieces, hoverR, hoverC, gameActive;
+let namePool, nameIndex;
+
+const AGENCIES = [
+  "Wieden+Kennedy","BBDO","Ogilvy","Leo Burnett","DDB Worldwide",
+  "McCann","Grey Group","Publicis","Saatchi & Saatchi","TBWA",
+  "JWT","Droga5","72andSunny","R/GA","Anomaly",
+  "Mother London","Forsman & Bodenfors","Adam&EveDDB","AMV BBDO","Deutsch",
+  "Mullen Lowe","Goodby Silverstein","The Martin Agency","Crispin Porter","Arnold Worldwide",
+  "180 Amsterdam","Fallon","Bartle Bogle Hegarty","Y&R","Havas Creative",
+  "Serviceplan","Jung von Matt","Kolle Rebbe","Scholz & Friends","Grabarz & Partner",
+  "Ruf Lanz","Heimat Berlin","Leagas Delaney","Lowe Lintas","Contract Advertising",
+  "Taproot Dentsu","Cheil Worldwide","Innocean","POSSIBLE","VML",
+  "Huge","SapientNitro","Razorfish","Isobar","AKQA",
+  "Fantasy","Work & Co","Instrument","Firstborn","Jam3",
+  "Buck","ManvsMachine","Framestore","The Mill","MPC Creative",
+  "Psyop","Logan","Superfad","Elastic","Imaginary Forces",
+  "Weber Shandwick","Edelman","Golin","FleishmanHillard","Burson Cohn & Wolfe",
+  "Zeno Group","Ketchum","Porter Novelli","Hill+Knowlton","Brunswick Group",
+  "Stink Films","RSA Films","Smuggler","Partizan","Biscuit Filmworks",
+  "MJZ","Anonymous Content","Caviar","B-Reel","Pulse Films",
+  "Pentagram","Collins","Wolff Olins","Landor","Interbrand",
+  "Moving Brands","DesignStudio","Ragged Edge","NB Studio","SomeOne",
+  "ustwo","Koto","Superflux","Accept & Proceed","Bibliothèque",
+  "Area 17","Digital Arts Network","Possible Worldwide","Tribal Worldwide","Sapient"
+];
+
+const DIMS = [
+  [2,3],[3,2],[2,4],[4,2],[3,3],[2,5],[5,2],
+  [3,4],[4,3],[5,3],[3,5],[4,4],[5,4],[4,5],[5,5]
+];
+
+function shuffleNames() {
+  const arr = [...AGENCIES];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  namePool = arr; nameIndex = 0;
+}
+function nextName() {
+  if (nameIndex >= namePool.length) shuffleNames();
+  return namePool[nameIndex++];
+}
+
+// Distribution: 30% all-pink, 30% all-blue, 35% gray wildcard, 5% split
+function makeColors(w, h) {
+  const roll = Math.random();
+  let colors = [];
+  if (roll < 0.30) {
+    for (let r = 0; r < h; r++) colors.push(Array(w).fill('pink'));
+  } else if (roll < 0.60) {
+    for (let r = 0; r < h; r++) colors.push(Array(w).fill('blue'));
+  } else if (roll < 0.95) {
+    for (let r = 0; r < h; r++) colors.push(Array(w).fill('gray'));
+  } else {
+    // Split: always 50/50 so it can straddle the boundary
+    const pinkRows = Math.max(1, Math.min(h - 1, Math.round(h / 2)));
+    for (let r = 0; r < h; r++) colors.push(Array(w).fill(r < pinkRows ? 'pink' : 'blue'));
+  }
+  return colors;
+}
+
+function rotateColors(colors) {
+  const h = colors.length, w = colors[0].length;
+  const out = Array.from({length: w}, () => Array(h).fill(null));
+  for (let r = 0; r < h; r++)
+    for (let c = 0; c < w; c++)
+      out[c][h - 1 - r] = colors[r][c];
+  return out;
+}
+
+function genPiece() {
+  const [w, h] = DIMS[Math.floor(Math.random() * DIMS.length)];
+  const colors = makeColors(w, h);
+  return { colors, name: nextName() };
+}
+function genPieces(n) { return Array.from({length: n}, genPiece); }
+function getColors() { return pieces[0].colors; }
+function getPH(c) { return c.length; }
+function getPW(c) { return c[0].length; }
+
+function canPlaceColors(pr, pc, colors) {
+  const h = getPH(colors), w = getPW(colors);
+  if (pr < 0 || pc < 0 || pr + h > ROWS || pc + w > COLS) return false;
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      const boardR = pr + r, boardC = pc + c;
+      if (grid[boardR][boardC]) return false;
+      const pieceColor = colors[r][c];
+      if (pieceColor !== 'gray') {
+        const zone = boardR < HALF ? 'pink' : 'blue';
+        if (pieceColor !== zone) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function canPlace(pr, pc) { return canPlaceColors(pr, pc, getColors()); }
+
+function hasAnyLegal() {
+  const base = pieces[0].colors;
+  let col = base;
+  for (let rot = 0; rot < 2; rot++) {
+    const h = getPH(col), w = getPW(col);
+    for (let r = 0; r <= ROWS - h; r++)
+      for (let c = 0; c <= COLS - w; c++)
+        if (canPlaceColors(r, c, col)) return true;
+    col = rotateColors(col);
+  }
+  return false;
+}
+
+let gridLabels = {};
+let gridPieceMeta = {};
+
+function placePiece(pr, pc) {
+  const colors = getColors();
+  const h = getPH(colors), w = getPW(colors);
+  const name = pieces[0].name;
+  const isAllGray = colors.every(row => row.every(v => v === 'gray'));
+  let pts = 0;
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      const cellColor = colors[r][c] === 'gray'
+        ? (pr + r < HALF ? 'pink' : 'blue')
+        : colors[r][c];
+      grid[pr + r][pc + c] = cellColor;
+      pts++;
+    }
+  }
+  gridLabels[`${pr},${pc}`] = { name, ph: h, pw: w, isGray: isAllGray };
+  score += pts;
+  pieces.shift();
+  if (pieces.length < QUEUE_VISIBLE + 2) pieces.push(...genPieces(3));
+  updateUI();
+  checkEnd();
+}
+
+function skipCost() {
+  const used = MAX_SKIPS - skips;
+  return SKIP_COSTS[Math.min(used, SKIP_COSTS.length - 1)];
+}
+
+function doRotate() {
+  if (!gameActive || !pieces.length) return;
+  pieces[0].colors = rotateColors(pieces[0].colors);
+  const h = getPH(getColors()), w = getPW(getColors());
+  document.getElementById('msg').textContent = `Rotated → ${w}×${h}`;
+  renderQueue();
+  renderCells();
+}
+
+function checkEnd() {
+  if (!gameActive) return;
+  if (!hasAnyLegal() && skips <= 0) triggerEnd('No legal placements and no skips left!');
+}
+
+function triggerEnd(reason) {
+  gameActive = false;
+  const filled = grid.flat().filter(Boolean).length;
+  const pct = Math.round(filled / (ROWS * COLS) * 100);
+  document.getElementById('go-reason').textContent = reason;
+  document.getElementById('go-score').textContent = score;
+  document.getElementById('go-coverage').textContent = pct + '%';
+  setTimeout(() => { document.getElementById('go-bar').style.width = pct + '%'; }, 50);
+  document.getElementById('gameover').classList.add('show');
+}
+
+function initGame() {
+  grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+  gridLabels = {}; gridPieceMeta = {};
+  score = 0; skips = MAX_SKIPS; gameActive = true;
+  hoverR = -1; hoverC = -1;
+  shuffleNames();
+  pieces = genPieces(QUEUE_VISIBLE + 3);
+  document.getElementById('gameover').classList.remove('show');
+  buildBoard();
+  updateUI();
+  document.getElementById('msg').textContent = 'Pink → Standard Work · Blue → Specialized Work · Gray → anywhere. Space to rotate.';
+}
+
+function buildBoard() {
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${COLS}, var(--cell))`;
+  board.style.gridTemplateRows = `repeat(${ROWS}, var(--cell))`;
+  board.innerHTML = '';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell ' + (r < HALF ? 'pink-zone' : 'blue-zone');
+      cell.dataset.r = r; cell.dataset.c = c;
+      cell.addEventListener('mouseenter', onHover);
+      cell.addEventListener('click', onClick);
+      board.appendChild(cell);
+    }
+  }
+  board.addEventListener('mouseleave', () => { hoverR = -1; hoverC = -1; renderCells(); });
+}
+
+function onHover(e) {
+  if (!gameActive) return;
+  hoverR = +e.target.dataset.r; hoverC = +e.target.dataset.c;
+  renderCells();
+}
+
+function onClick(e) {
+  if (!gameActive) return;
+  const r = +e.target.dataset.r, c = +e.target.dataset.c;
+  if (canPlace(r, c)) {
+    placePiece(r, c);
+    hoverR = r; hoverC = c;
+    renderCells();
+  } else {
+    document.getElementById('msg').textContent = "Can't place there — zone mismatch or cell occupied.";
+  }
+}
+
+const CELL_PX = 34;
+
+function renderCells() {
+  const colors = pieces.length > 0 ? getColors() : null;
+  const ph = colors ? getPH(colors) : 0;
+  const pw = colors ? getPW(colors) : 0;
+  const canP = colors && hoverR >= 0 && canPlace(hoverR, hoverC);
+
+  document.querySelectorAll('.piece-label-overlay').forEach(el => el.remove());
+
+  document.querySelectorAll('.cell').forEach(cell => {
+    const r = +cell.dataset.r, c = +cell.dataset.c;
+    const v = grid[r][c];
+    cell.className = 'cell';
+    cell.style.background = '';
+    if (v === 'pink') cell.classList.add('filled-pink');
+    else if (v === 'blue') cell.classList.add('filled-blue');
+    else cell.classList.add(r < HALF ? 'pink-zone' : 'blue-zone');
+
+    if (colors && hoverR >= 0) {
+      const pr = r - hoverR, pc = c - hoverC;
+      if (pr >= 0 && pr < ph && pc >= 0 && pc < pw) {
+        const pieceColor = colors[pr][pc];
+        if (pieceColor === 'pink') cell.style.background = 'rgba(224,82,127,0.45)';
+        else if (pieceColor === 'blue') cell.style.background = 'rgba(58,142,230,0.45)';
+        else cell.style.background = 'rgba(120,110,160,0.55)';
+        cell.classList.add(canP ? 'hl-ok' : 'hl-bad');
+      }
+    }
+  });
+
+  const board = document.getElementById('board');
+  Object.entries(gridLabels).forEach(([key, {name, ph: lph, pw: lpw, isGray}]) => {
+    const [lr, lc] = key.split(',').map(Number);
+    const overlay = document.createElement('div');
+    overlay.className = 'piece-label-overlay';
+    overlay.textContent = name;
+    overlay.style.cssText = `
+      position: absolute;
+      left: ${lc * CELL_PX}px; top: ${lr * CELL_PX}px;
+      width: ${lpw * CELL_PX}px; height: ${lph * CELL_PX}px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-size: ${Math.max(7, Math.min(11, Math.floor(lpw * CELL_PX / name.length * 1.4)))}px;
+      font-weight: 500;
+      color: ${isGray ? 'rgba(220,210,255,0.9)' : 'rgba(255,255,255,0.85)'};
+      text-align: center; padding: 2px 4px;
+      pointer-events: none; z-index: 4; line-height: 1.2;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      overflow: hidden; word-break: break-word;
+    `;
+    board.appendChild(overlay);
+  });
+}
+
+function updateUI() {
+  document.getElementById('score').textContent = score;
+  const filled = grid.flat().filter(Boolean).length;
+  document.getElementById('coverage').textContent = Math.round(filled / (ROWS * COLS) * 100) + '%';
+  renderPips();
+  renderSkipCost();
+  renderCells();
+  renderQueue();
+  document.getElementById('btn-skip').disabled = skips <= 0 || !gameActive;
+  document.getElementById('btn-rotate').disabled = !gameActive;
+}
+
+function renderPips() {
+  const container = document.getElementById('pips');
+  container.innerHTML = '';
+  for (let i = 0; i < MAX_SKIPS; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'pip' + (i >= skips ? ' used' : '');
+    container.appendChild(pip);
+  }
+}
+
+function renderSkipCost() {
+  const el = document.getElementById('skip-cost');
+  if (!el) return;
+  if (skips <= 0) {
+    el.textContent = 'no skips left';
+  } else {
+    el.textContent = `next skip: −${skipCost()} pts`;
+  }
+}
+
+function renderQueue() {
+  const queue = document.getElementById('queue');
+  queue.innerHTML = '';
+  const show = pieces.slice(0, QUEUE_VISIBLE);
+  show.forEach((p, i) => {
+    const colors = p.colors;
+    const ph = getPH(colors), pw = getPW(colors);
+    const isGray = colors.every(row => row.every(v => v === 'gray'));
+    const wrap = document.createElement('div');
+    wrap.className = 'qpiece' + (i === 0 ? ' active' : '');
+    if (isGray) wrap.style.borderColor = 'rgba(160,150,200,0.5)';
+
+    const pgWrap = document.createElement('div');
+    pgWrap.style.cssText = 'position: relative; display: inline-block;';
+
+    const pg = document.createElement('div');
+    pg.className = 'piece-grid';
+    pg.style.gridTemplateColumns = `repeat(${pw}, 22px)`;
+
+    for (let r = 0; r < ph; r++) {
+      for (let c = 0; c < pw; c++) {
+        const pcell = document.createElement('div');
+        pcell.className = 'pcell';
+        const col = colors[r][c];
+        pcell.style.background = col === 'pink' ? 'var(--pink-placed)'
+          : col === 'blue' ? 'var(--blue-placed)'
+          : '#5a5470';
+        pg.appendChild(pcell);
+      }
+    }
+
+    const nameOverlay = document.createElement('div');
+    const fontSize = Math.max(6, Math.min(10, Math.floor(pw * 22 / p.name.length * 1.3)));
+    nameOverlay.style.cssText = `
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'DM Mono', monospace; font-size: ${fontSize}px; font-weight: 500;
+      color: rgba(255,255,255,0.9); text-align: center; padding: 2px;
+      pointer-events: none; z-index: 2; line-height: 1.2;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.6); word-break: break-word;
+    `;
+    nameOverlay.textContent = p.name;
+
+    pgWrap.appendChild(pg); pgWrap.appendChild(nameOverlay);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'qlabel';
+    lbl.textContent = isGray ? `✦ flex ${pw}×${ph}` : (i === 0 ? `${pw}×${ph} ←` : `${pw}×${ph}`);
+    if (isGray) lbl.style.color = 'rgba(180,170,220,0.8)';
+
+    wrap.appendChild(pgWrap); wrap.appendChild(lbl);
+    queue.appendChild(wrap);
+  });
+}
+
+document.getElementById('btn-rotate').addEventListener('click', doRotate);
+
+document.getElementById('btn-skip').addEventListener('click', () => {
+  if (!gameActive || skips <= 0) return;
+  const cost = skipCost();
+  skips--;
+  score = Math.max(0, score - cost);
+  pieces.push(pieces.shift());
+  document.getElementById('msg').textContent = `Skipped! −${cost} pts. ${skips} skip${skips !== 1 ? 's' : ''} left.`;
+  updateUI();
+  checkEnd();
+});
+
+document.getElementById('btn-restart').addEventListener('click', initGame);
+
+document.addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); doRotate(); }
+  if (e.key === 's' || e.key === 'S') document.getElementById('btn-skip').click();
+  if (e.key === 'r' || e.key === 'R') document.getElementById('btn-restart').click();
+});
+
+initGame();
+</script>
+</body>
+</html>
